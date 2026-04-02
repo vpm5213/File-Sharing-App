@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>File Share</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+<div class="frame">
+<div class="header">
+    <h1 class="word">Welcome, {{ session.username }}!</h1>
+</div>
+<div class="border">
+    <p class="word">{{ session.get('msg') }}.</p>
+    <a class="btn" href="{{ url_for('logout') }}">Logout</a>
+</div>
+</div>
+<div class="container">
+
+<h1>📂 File Share</h1>
+<h3>📱 Scan to Connect</h3>
+  <img src="{{ url_for('static', filename=qr) }}" width="150">
+  <p>{{ url }}</p>
+
+<form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+
+  <label class="upload-box" id="drop-area">
+    <p>Drag & Drop File Here<br>or Click to Select</p>
+    <input type="file" name="file" id="fileInput">
+  </label>
+  <p id="file-name" style="margin-top:10px; color:#38bdf8;"></p>
+  <button type="submit">Upload</button>
+</form>
+
+<div id="progress-container" style="display:none;">
+  <div id="progress-bar"></div>
+</div>
+
+<h2>📁 Files</h2>
+
+<ul>
+  {% for file in files %}
+    <li>
+      <div>
+        {{ file }} <br>
+        {% if file.endswith('.png') or file.endswith('.jpg') or file.endswith('.jpeg')%}
+          <img src="/download/{{ file }}" width="100">
+        {% elif file.endswith('.mp4') or file.endswith('.webm')%}
+          <video width="150" controls>
+            <source src="/download/{{ file }}">
+          </video>
+        {% elif file.endswith('.wav') or file.endswith('.mp3') or file.endswith('.ogg') %}
+          <audio width="150" controls>
+            <source src="/download/{{ file }}">
+          </audio>
+        {% endif %}
+      <a href="/download/{{ file }}">⬇ Download</a>
+      </div>
+      
+    </li>
+  {% endfor %}
+</ul>
+
+</div>
+<script>
+const form = document.getElementById("uploadForm");
+const fileInput = document.getElementById("fileInput");
+const fileNameDisplay = document.getElementById("file-name");
+const progressBar = document.getElementById("progress-bar");
+const progressContainer = document.getElementById("progress-container");
+const dropArea = document.getElementById("drop-area");
+
+//dropArea.addEventListener("click", () => fileInput.click());
+
+dropArea.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropArea.style.background = "#1e293b";
+});
+
+dropArea.addEventListener("dragleave", () => {
+  dropArea.style.background = "transparent";
+});
+
+dropArea.addEventListener("drop", (e) => {
+  e.preventDefault();
+  fileInput.files = e.dataTransfer.files;
+  if (fileInput.files.length > 0) {
+    fileNameDisplay.textContent = "Selected: " + fileInput.files[0].name;
+  }
+  dropArea.style.background = "transparent";
+});
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length > 0) {
+    fileNameDisplay.textContent = "Selected: " + fileInput.files[0].name;
+  }
+});
+
+form.addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const chunkSize = 1024 * 1024; // 1MB
+  let start = 0;
+
+  progressContainer.style.display = "block";
+
+  while (start < file.size) {
+    let chunk = file.slice(start, start + chunkSize);
+
+    let formData = new FormData();
+    formData.append("chunk", chunk);
+    formData.append("filename", file.name);
+
+    await fetch("/upload_chunk", {
+      method: "POST",
+      body: formData
+    });
+
+    start += chunkSize;
+
+    let percent = (start / file.size) * 100;
+    progressBar.style.width = percent + "%";
+  }
+
+  // Done
+  setTimeout(() => {
+    location.reload();
+  }, 500);
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,103 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: white;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+  padding: 20px;
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+.upload-box {
+  display: block;
+  border: 2px dashed #1bbbff;
+  padding: 40px;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.upload-box:focus {
+  outline: none;
+}
+
+.upload-box:hover {
+  background: rgba(56, 189, 248, 0.1);
+}
+
+input[type="file"] {
+  display: none;
+}
+
+button {
+  margin-top: 15px;
+  padding: 10px 25px;
+  border: none;
+  background: #38bdf8;
+  color: black;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+h2 {
+  margin-top: 30px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  width:min-content;
+  background: #1e293b;
+  margin: 10px 0;
+  padding: 12px 15px;
+  border-radius: 10px;
+  display: flex;
+  justify-content:space-between;
+  align-items: center;
+}
+
+a {
+  color: #38bdf8;
+  text-decoration: none;
+  font-weight: bold;
+
+}
+
+a:hover {
+  text-decoration:underline;
+  text-decoration-color: #1bbbff;
+}
+
+.frame {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+  padding: 12px 15px;
+  text-align: center;
+
+}
+#progress-container {
+  width: 100%;
+  background: #1e293b;
+  margin-top: 15px;
+  border-radius: 10px;
+}
+
+#progress-bar {
+  width: 0%;
+  height: 10px;
+  background: #22c55e;
+  border-radius: 10px;
+}
