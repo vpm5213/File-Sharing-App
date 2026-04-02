@@ -11,18 +11,23 @@ from dotenv import load_dotenv
 import re
 
 app = Flask(__name__)
-load_dotenv()
-app.secret_key = os.getenv('SECRET_KEY')
+app.secret_key = os.getenv('SECRET_KEY', 'super-secret-key')
 
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = os.getenv('PASSWORD')
-if not os.getenv('PASSWORD'):
+app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST')
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER')
+app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
+app.config['MYSQL_DB'] = os.getenv('MYSQL_DB')
+app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', 3306))
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+if not os.getenv('MYSQL_PASSWORD'):
     raise ValueError("MySQL PASSWORD not loaded from .env")
-app.config['MYSQL_DB'] = 'flask_login'
-
 mysql = MySQL(app)
 
+try:
+    mysql.connection.ping(True)
+except Exception as e:
+    print("Database connection failed:", e)
+    
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -49,6 +54,7 @@ def login():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM accounts WHERE username = %s', (username, ))
     account = cursor.fetchone()
+    cursor.close()
     if account and check_password_hash(account['password'], password):
       session['loggedin'] = True
       session['id'] = account['id']
@@ -97,8 +103,7 @@ def index():
   if 'loggedin' not in session:
         return redirect(url_for('login'))
   files = os.listdir(UPLOAD_FOLDER)
-  ip = get_ip()
-  url = f"http://{ip}:5001"
+  url = request.host_url
   qr_path = os.path.join("static", "qr.png")
   qr = qrcode.make(url)
   qr.save(qr_path)
@@ -143,4 +148,5 @@ def upload_chunk():
     return "Chunk received"
 
 if __name__ == '__main__':
-  serve(app, port=5001)
+  port = int(os.environ.get("PORT", 5001))
+  serve(app, host="0.0.0.0", port=port)
