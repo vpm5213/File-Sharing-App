@@ -4,30 +4,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from waitress import serve
 import os
 import qrcode
-import socket
-from flask_mysqldb import MySQL
-import MySQLdb.cursors
-from dotenv import load_dotenv
+import psycopg2
 import re
 
 app = Flask(__name__)
+
 app.secret_key = os.getenv('SECRET_KEY', 'super-secret-key')
 
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST')
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB')
-app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', 3306))
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-if not app.config['MYSQL_PASSWORD']:
-    raise ValueError("MySQL PASSWORD not loaded from .env")
-mysql = MySQL(app)
-
-try:
-    mysql.connection.ping(True)
-except:
-    mysql = MySQL(app)
-
+def get_db():
+    return psycopg2.connect(os.getenv("DATABASE_URL"), sslmode='require')
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -40,14 +25,16 @@ def login():
   if request.method == 'POST' and 'username' in request.form and 'password' in request.form:
     username = request.form['username']
     password = request.form['password']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('SELECT * FROM accounts WHERE username = %s', (username, ))
     account = cursor.fetchone()
     cursor.close()
-    if account and check_password_hash(account['password'], password):
+    conn.close()
+    if account and check_password_hash(account[2], password):
       session['loggedin'] = True
-      session['id'] = account['id']
-      session['username'] = account['username']
+      session['id'] = account[0]
+      session['username'] = account[1]
       session['msg'] = "Logged in Successfully!"
       return redirect(url_for('index'))
     else:
@@ -68,10 +55,10 @@ def register():
     username = request.form['username']
     password = request.form['password']
     email = request.form['email']
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('SELECT * FROM accounts WHERE username = %s',(username,))
     account = cursor.fetchone()
-    cursor.close()
       
     if account:
       msg = "Account already exists!"
@@ -83,11 +70,13 @@ def register():
       msg = 'Please fill out the form!'
     else:
       hashed_password = generate_password_hash(password)
-      cursor = mysql.connection.cursor()
-      cursor.execute('INSERT INTO accounts VALUES (NULL, %s, %s, %s)', (username, hashed_password, email))
-      mysql.connection.commit()
-      cursor.close()
+      cursor = conn.cursor()
+      cursor.execute('INSERT INTO accounts (username, password, email) VALUES (%s, %s, %s)',(username, hashed_password, email))
+      conn.commit()
       msg = "You have successfully registered!"
+    cursor.close()
+    conn.close()
+
   return render_template('register.html', msg=msg)
 
 @app.route('/index', methods=['GET', 'POST'])
@@ -113,9 +102,7 @@ def upload():
         return redirect(url_for('index'))
    if file and allowed_file(file.filename):
     filename = secure_filename(file.filename)
-    file.stream.seek(0)
-    with open(os.path.join(UPLOAD_FOLDER, filename), "wb") as f:
-      f.write(file.read())
+    file.save(os.path.join(UPLOAD_FOLDER, filename))
    else:
     return "Invalid file type"
    return redirect(url_for('index'))
