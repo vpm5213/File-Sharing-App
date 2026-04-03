@@ -21,3 +21,4 @@ waitress==3.0.2
 werkzeug==3.1.7
 Flask-SQLAlchemy
 pymysql
+psycopg2-binary
