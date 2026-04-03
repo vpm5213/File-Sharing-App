@@ -19,30 +19,19 @@ app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
 app.config['MYSQL_DB'] = os.getenv('MYSQL_DB')
 app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-if not os.getenv('MYSQL_PASSWORD'):
+if not app.config['MYSQL_PASSWORD']:
     raise ValueError("MySQL PASSWORD not loaded from .env")
 mysql = MySQL(app)
 
 try:
     mysql.connection.ping(True)
-except Exception as e:
-    print("Database connection failed:", e)
-    
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-    except Exception:
-        ip = "127.0.0.1"
-    finally:
-        s.close()
-    return ip
+except:
+    mysql = MySQL(app)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  
+app.config['MAX_CONTENT_LENGTH'] = 50  * 1024 * 1024  
 
 @app.route('/')
 @app.route('/login', methods=['GET', 'POST'])
@@ -82,7 +71,8 @@ def register():
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM accounts WHERE username = %s',(username,))
     account = cursor.fetchone()
-    
+    cursor.close()
+      
     if account:
       msg = "Account already exists!"
     elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
@@ -93,8 +83,10 @@ def register():
       msg = 'Please fill out the form!'
     else:
       hashed_password = generate_password_hash(password)
+      cursor = mysql.connection.cursor()
       cursor.execute('INSERT INTO accounts VALUES (NULL, %s, %s, %s)', (username, hashed_password, email))
       mysql.connection.commit()
+      cursor.close()
       msg = "You have successfully registered!"
   return render_template('register.html', msg=msg)
 
@@ -108,7 +100,10 @@ def index():
   qr = qrcode.make(url)
   qr.save(qr_path)
   return render_template('index.html', files=files, qr="qr.png", url=url)
-  
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'zip', 'txt'}
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 @app.route('/upload', methods=["POST"])
 def upload():
    if 'loggedin' not in session:
@@ -116,11 +111,13 @@ def upload():
    file = request.files.get('file')
    if not file or file.filename == '':
         return redirect(url_for('index'))
-   if file:
+   if file and allowed_file(file.filename):
     filename = secure_filename(file.filename)
     file.stream.seek(0)
     with open(os.path.join(UPLOAD_FOLDER, filename), "wb") as f:
       f.write(file.read())
+   else:
+    return "Invalid file type"
    return redirect(url_for('index'))
 
 @app.route("/download/<filename>")
